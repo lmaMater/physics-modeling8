@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Визуализация критерия Релея</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #202124;
+            color: #fff;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        .form-container {
+            width: 30%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        form {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        form label {
+            display: block;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        form input {
+            width: calc(100% - 10px);
+            padding: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #555;
+            border-radius: 5px;
+            background-color: #444;
+            color: #fff;
+        }
+        button {
+            width: calc(100% - 20px);
+            padding: 10px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.5s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #plots-container {
+            width: 70%;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+        .plot {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            height: 50%;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Ввод параметров -->
+    <div class="form-container">
+        <h1>Параметры</h1>
+        <form id="paramsForm">
+            <label for="input-diameter">Диаметр отверстий (мм):</label>
+            <input type="number" step="0.01" min="0" id="input-diameter" value="0.5">
+            <br>
+            <label for="input-distance">Расстояние между отверстиями (мм):</label>
+            <input type="number" step="0.01" min="0" id="input-distance" value="1.0">
+            <br>
+            <label for="input-wavelength">Длина волны (нм):</label>
+            <input type="number" step="0.01" min="0" id="input-wavelength" value="500">
+            <br>
+            <label for="input-distance-to-screen">Расстояние до экрана (м):</label>
+            <input type="number" step="0.01" min="0" id="input-distance-to-screen" value="1.0">
+            <br>
+            <button onclick="event.preventDefault(); calculate()">Рассчитать</button>
+        </form>
+    </div>
+
+    <!-- Графики -->
+    <div id="plots-container">
+        <div id="plot-screen" class="plot"></div>
+        <div id="plot-angle" class="plot"></div>
+    </div>
+</div>
+
+<script>
+    const drawGraphic = (data, elementId, xLabel, yLabel) => {
+        const layout = {
+            title: {
+                text: xLabel,
+                font: {
+                    color: '#fff'
+                }
+            },
+            xaxis: {
+                autorange: true,
+                title: {
+                    text: xLabel,
+                    font: {
+                        color: '#fff'
+                    }
+                },
+                color: '#fff'
+            },
+            yaxis: {
+                autorange: true,
+                zeroline: false,
+                showticklabels: false,
+                showgrid: false,
+                title: {
+                    text: yLabel,
+                    font: {
+                        color: '#fff'
+                    }
+                },
+                color: '#fff'
+            },
+            autosize: true,
+            plot_bgcolor: "#202124",
+            paper_bgcolor: "#202124"
+        }
+
+        Plotly.newPlot(elementId, data, layout);
+    }
+
+    const calculate = () => {
+        const diameter = parseFloat(document.getElementById("input-diameter").value) * 1e-3;
+        const distanceBetweenHoles = parseFloat(document.getElementById("input-distance").value) * 1e-3;
+        const wavelengthNm = parseFloat(document.getElementById("input-wavelength").value);
+        const distanceToScreen = parseFloat(document.getElementById("input-distance-to-screen").value);
+
+        if (diameter <= 0 || distanceBetweenHoles <= 0 || wavelengthNm <= 0 || distanceToScreen <= 0) {
+            alert("Введите положительные значения!");
+            return;
+        }
+
+        const wavelength = wavelengthNm * 1e-9;
+        const xValuesScreen = [];
+        const iValuesScreen = [];
+        const xValuesAngle = [];
+        const iValuesAngle = [];
+        const step = 1e-4;
+
+        // Вычисление для координаты на экране
+        for (let x = -0.01; x <= 0.01; x += step) {
+            const sinTheta = x / distanceToScreen;
+            const alpha = (Math.PI * diameter * sinTheta) / wavelength;
+            const beta = (Math.PI * distanceBetweenHoles * sinTheta) / wavelength;
+
+            xValuesScreen.push(x);
+            const I = (Math.sin(alpha) / alpha) ** 2 * (Math.cos(beta) ** 2);
+            iValuesScreen.push(I);
+        }
+
+        // Вычисление для синуса угла дифракции
+        for (let theta = -0.01; theta <= 0.01; theta += step) {
+            const sinTheta = Math.sin(theta);
+            const alpha = (Math.PI * diameter * sinTheta) / wavelength;
+            const beta = (Math.PI * distanceBetweenHoles * sinTheta) / wavelength;
+
+            xValuesAngle.push(sinTheta);
+            const I = (Math.sin(alpha) / alpha) ** 2 * (Math.cos(beta) ** 2);
+            iValuesAngle.push(I);
+        }
+
+        const dataScreen = [{
+            x: xValuesScreen,
+            y: iValuesScreen,
+            type: 'scatter',
+            mode: 'lines',
+            line: {
+                color: '#00ff00'
+            }
+        }];
+
+        const dataAngle = [{
+            x: xValuesAngle,
+            y: iValuesAngle,
+            type: 'scatter',
+            mode: 'lines',
+            line: {
+                color: '#00ff00'
+            }
+        }];
+
+        drawGraphic(dataScreen, 'plot-screen', 'Координата на экране (м)', 'Интенсивность');
+        drawGraphic(dataAngle, 'plot-angle', 'Синус угла дифракции', 'Интенсивность');
+    }
+
+    document.addEventListener("DOMContentLoaded", calculate);
+</script>
+
+</body>
+</html>
